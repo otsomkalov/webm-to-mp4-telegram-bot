@@ -19,12 +19,25 @@ module Workflows =
   module User =
     type Load = UserId -> Task<User>
 
+  type IUserConversionLoader =
+    abstract member LoadUserConversion: UserConversion.Load
+  type IMessageEditor =
+    abstract member EditBotMessage: EditBotMessage
+
+  type IUserLoader =
+    abstract member LoadUser: User.Load
+
+  type ICompletedConversionLoader =
+    abstract member LoadCompletedConversion: Conversion.Completed.Load
+
+  type ITranslationsLoader =
+    abstract member GetLocaleTranslations: Translation.GetLocaleTranslations
+
+  type INewConversionPreparator =
+    abstract member Prepare: Conversion.New.Prepare
+
   let downloadFileAndQueueConversion
-    (editBotMessage: EditBotMessage)
-    (loadUserConversion: UserConversion.Load)
-    (loadUser: User.Load)
-    (getLocaleTranslations: Translation.GetLocaleTranslations)
-    (prepareConversion: Conversion.New.Prepare)
+    (env: #IUserConversionLoader & #IMessageEditor & #IUserLoader & #ITranslationsLoader & #INewConversionPreparator)
     : DownloadFileAndQueueConversion =
 
     let onSuccess editMessage tran =
@@ -39,28 +52,25 @@ module Workflows =
 
     fun conversionId file ->
       task {
-        let! userConversion = loadUserConversion conversionId
+        let! userConversion = env.LoadUserConversion conversionId
 
         let! tran, _ =
           userConversion.UserId
-          |> Option.taskMap loadUser
+          |> Option.taskMap env.LoadUser
           |> Task.map (Option.bind (_.Lang))
-          |> Task.bind getLocaleTranslations
+          |> Task.bind env.GetLocaleTranslations
 
-        let editMessage = editBotMessage userConversion.ChatId userConversion.SentMessageId
+        let editMessage = env.EditBotMessage userConversion.ChatId userConversion.SentMessageId
 
         let onSuccess = (onSuccess editMessage tran)
         let onError = (onError editMessage tran)
 
-        return! prepareConversion conversionId file |> TaskResult.taskEither onSuccess onError
+        return! env.Prepare conversionId file |> TaskResult.taskEither onSuccess onError
       }
 
   let processConversionResult
-    (loadUserConversion: UserConversion.Load)
-    (editBotMessage: EditBotMessage)
+    (env: #IUserConversionLoader & #IMessageEditor & #IUserLoader & #ITranslationsLoader)
     (loadPreparedOrThumbnailed: Conversion.PreparedOrThumbnailed.Load)
-    (loadUser: User.Load)
-    (getLocaleTranslations: Translation.GetLocaleTranslations)
     (saveVideo: Conversion.Prepared.SaveVideo)
     (complete: Conversion.Thumbnailed.Complete)
     (queueUpload: Conversion.Completed.QueueUpload)
@@ -81,15 +91,15 @@ module Workflows =
 
     fun conversionId result ->
       task {
-        let! userConversion = loadUserConversion conversionId
+        let! userConversion = env.LoadUserConversion conversionId
 
-        let editMessage = editBotMessage userConversion.ChatId userConversion.SentMessageId
+        let editMessage = env.EditBotMessage userConversion.ChatId userConversion.SentMessageId
 
         let! tran, _ =
           userConversion.UserId
-          |> Option.taskMap loadUser
+          |> Option.taskMap env.LoadUser
           |> Task.map (Option.bind (_.Lang))
-          |> Task.bind getLocaleTranslations
+          |> Task.bind env.GetLocaleTranslations
 
         let! conversion = loadPreparedOrThumbnailed conversionId
 
@@ -97,11 +107,8 @@ module Workflows =
       }
 
   let processThumbnailingResult
-    (loadUserConversion: UserConversion.Load)
-    (editBotMessage: EditBotMessage)
+    (env: #IUserConversionLoader & #IMessageEditor & #IUserLoader & #ITranslationsLoader)
     (loadPreparedOrConverted: Conversion.PreparedOrConverted.Load)
-    (loadUser: User.Load)
-    (getLocaleTranslations: Translation.GetLocaleTranslations)
     (saveThumbnail: Conversion.Prepared.SaveThumbnail)
     (complete: Conversion.Converted.Complete)
     (queueUpload: Conversion.Completed.QueueUpload)
@@ -122,15 +129,15 @@ module Workflows =
 
     fun conversionId result ->
       task {
-        let! userConversion = loadUserConversion conversionId
+        let! userConversion = env.LoadUserConversion conversionId
 
-        let editMessage = editBotMessage userConversion.ChatId userConversion.SentMessageId
+        let editMessage = env.EditBotMessage userConversion.ChatId userConversion.SentMessageId
 
         let! tran, _ =
           userConversion.UserId
-          |> Option.taskMap loadUser
+          |> Option.taskMap env.LoadUser
           |> Task.map (Option.bind (_.Lang))
-          |> Task.bind getLocaleTranslations
+          |> Task.bind env.GetLocaleTranslations
 
         let! conversion = loadPreparedOrConverted conversionId
 
@@ -138,8 +145,7 @@ module Workflows =
       }
 
   let uploadCompletedConversion
-    (loadUserConversion: UserConversion.Load)
-    (loadCompletedConversion: Conversion.Completed.Load)
+    (env: #IUserConversionLoader & #ICompletedConversionLoader)
     (deleteBotMessage: DeleteBotMessage)
     (replyWithVideo: ReplyWithVideo)
     (deleteVideo: Conversion.Completed.DeleteVideo)
@@ -147,8 +153,8 @@ module Workflows =
     : UploadCompletedConversion =
     fun id ->
       task {
-        let! userConversion = loadUserConversion id
-        let! conversion = loadCompletedConversion id
+        let! userConversion = env.LoadUserConversion id
+        let! conversion = env.LoadCompletedConversion id
 
         do! replyWithVideo userConversion.ChatId userConversion.ReceivedMessageId conversion.OutputFile conversion.ThumbnailFile
 

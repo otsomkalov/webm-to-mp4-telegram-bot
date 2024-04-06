@@ -11,7 +11,7 @@ module Repos =
   module Conversion =
     [<RequireQualifiedAccess>]
     module New =
-      let load (db: IMongoDatabase) : Conversion.New.Load =
+      let load (db: IMongoDatabase) =
         let collection = db.GetCollection "conversions"
 
         fun conversionId ->

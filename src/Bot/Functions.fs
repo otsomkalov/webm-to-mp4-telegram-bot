@@ -18,6 +18,7 @@ open MongoDB.Driver
 open Telegram.Bot.Types
 open Telegram.Bot.Types.Enums
 open Telegram.Core
+open Telegram.Infrastructure.Startup
 open Telegram.Workflows
 open shortid
 open otsom.fs.Extensions
@@ -32,18 +33,14 @@ type Functions
     _logger: ILogger<Functions>,
     sendUserMessage: SendUserMessage,
     replyToUserMessage: ReplyToUserMessage,
-    editBotMessage: EditBotMessage,
     inputValidationSettings: Settings.InputValidationSettings,
     loggerFactory: ILoggerFactory,
-    loadUserConversion: UserConversion.Load,
-    loadCompletedConversion: Conversion.Completed.Load,
     deleteBotMessage: DeleteBotMessage,
     replyWithVideo: ReplyWithVideo,
     deleteVideo: Conversion.Completed.DeleteVideo,
     deleteThumbnail: Conversion.Completed.DeleteThumbnail,
     getLocaleTranslations: Translation.GetLocaleTranslations,
     queueUpload: Conversion.Completed.QueueUpload,
-    loadUser: User.Load,
     completeThumbnailedConversion: Conversion.Thumbnailed.Complete,
     completeConvertedConversion: Conversion.Converted.Complete,
     loadPreparedOrThumbnailed: Conversion.PreparedOrThumbnailed.Load,
@@ -53,7 +50,7 @@ type Functions
     downloadLink: Conversion.New.InputFile.DownloadLink,
     downloadDocument: Conversion.New.InputFile.DownloadDocument,
     savePreparedConversion: Conversion.Prepared.Save,
-    loadNewConversion: Conversion.New.Load
+    env: TGEnv
   ) =
 
   let sendDownloaderMessage = Queue.sendDownloaderMessage workersSettings _logger
@@ -197,7 +194,7 @@ type Functions
       Conversion.New.prepare downloadLink downloadDocument savePreparedConversion queueConversion queueThumbnailing
 
     let downloadFileAndQueueConversion =
-      downloadFileAndQueueConversion editBotMessage loadUserConversion loadUser getLocaleTranslations prepareConversion
+      downloadFileAndQueueConversion env
 
     downloadFileAndQueueConversion message.ConversionId message.File
 
@@ -209,11 +206,8 @@ type Functions
     ) : Task<unit> =
     let processConversionResult =
       processConversionResult
-        loadUserConversion
-        editBotMessage
+        env
         loadPreparedOrThumbnailed
-        loadUser
-        getLocaleTranslations
         saveVideo
         completeThumbnailedConversion
         queueUpload
@@ -228,11 +222,8 @@ type Functions
     ) : Task<unit> =
     let processThumbnailingResult =
       processThumbnailingResult
-        loadUserConversion
-        editBotMessage
+        env
         loadPreparedOrConverted
-        loadUser
-        getLocaleTranslations
         saveThumbnail
         completeConvertedConversion
         queueUpload
@@ -248,6 +239,6 @@ type Functions
     let conversionId = message.ConversionId |> ConversionId
 
     let uploadSuccessfulConversion =
-      uploadCompletedConversion loadUserConversion loadCompletedConversion deleteBotMessage replyWithVideo deleteVideo deleteThumbnail
+      uploadCompletedConversion env deleteBotMessage replyWithVideo deleteVideo deleteThumbnail
 
     uploadSuccessfulConversion conversionId

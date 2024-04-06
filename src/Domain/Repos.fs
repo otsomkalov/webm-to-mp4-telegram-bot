@@ -2,7 +2,7 @@
 
 open System.Threading.Tasks
 open Domain.Core
-open otsom.fs.Extensions
+open Microsoft.FSharp.Core
 
 module Repos =
   [<RequireQualifiedAccess>]
@@ -24,6 +24,14 @@ module Repos =
       type QueueThumbnailing = Conversion.Prepared -> Task<unit>
 
     [<RequireQualifiedAccess>]
+    module Converted =
+      type Save = Conversion.Converted -> Task<Conversion.Converted>
+
+    [<RequireQualifiedAccess>]
+    module Thumbnailed =
+      type Save = Conversion.Thumbnailed -> Task<Conversion.Thumbnailed>
+
+    [<RequireQualifiedAccess>]
     module Completed =
       type Save = Conversion.Completed -> Task<Conversion.Completed>
 
@@ -41,10 +49,26 @@ module Repos =
     module PreparedOrThumbnailed =
       type Load = ConversionId -> Task<Conversion.PreparedOrThumbnailed>
 
-    [<RequireQualifiedAccess>]
-    module Thumbnailed =
-      type Save = Conversion.Thumbnailed -> Task<unit>
+  type IPreparedOrConvertedConversionLoader =
+    abstract member LoadPreparedOrConverted: Conversion.PreparedOrConverted.Load
 
-    [<RequireQualifiedAccess>]
-    module Converted =
-      type Save = Conversion.Converted -> Task<unit>
+  type IPreparedOrThumbnailedConversionLoader =
+    abstract member LoadPreparedOrThumbnailed: Conversion.PreparedOrThumbnailed.Load
+
+  type INewConversionLoader =
+    abstract member LoadNew: Conversion.New.Load
+
+  type IPreparedConversionSaver =
+    abstract member SavePrepared: Conversion.Prepared.Save
+
+  type ICompletedConversionLoader =
+    abstract member LoadCompleted: Conversion.Completed.Load
+
+  type ICompletedConversionSaver =
+    abstract member SaveCompleted: Conversion.Completed.Save
+
+  type IConvertedConversionSaver =
+    abstract member SaveConverted: Conversion.Converted.Save
+
+  type IThumbnailedConversionSaver =
+    abstract member SaveThumbnailed: Conversion.Thumbnailed.Save

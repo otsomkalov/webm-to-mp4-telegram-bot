@@ -10,9 +10,9 @@ module Workflows =
     [<RequireQualifiedAccess>]
     module New =
       let prepare
+        (env: #IPreparedConversionSaver)
         (downloadLink: Conversion.New.InputFile.DownloadLink)
         (downloadDocument: Conversion.New.InputFile.DownloadDocument)
-        (savePreparedConversion: Conversion.Prepared.Save)
         (queueConversion: Conversion.Prepared.QueueConversion)
         (queueThumbnailing: Conversion.Prepared.QueueThumbnailing)
         : Conversion.New.Prepare =
@@ -24,44 +24,44 @@ module Workflows =
             { Id = conversionId
               InputFile = downloadedFile }
             : Conversion.Prepared)
-          |> TaskResult.taskTap savePreparedConversion
+          |> TaskResult.taskTap env.SavePrepared
           |> TaskResult.taskTap queueConversion
           |> TaskResult.taskTap queueThumbnailing
 
     [<RequireQualifiedAccess>]
     module Thumbnailed =
-      let complete (saveCompletedConversion: Conversion.Completed.Save) : Conversion.Thumbnailed.Complete =
+      let complete (env: #ICompletedConversionSaver) : Conversion.Thumbnailed.Complete =
         fun conversion video ->
-          saveCompletedConversion
+          env.SaveCompleted
             { Id = conversion.Id
               OutputFile = video |> Conversion.Video
               ThumbnailFile = conversion.ThumbnailName |> Conversion.Thumbnail }
 
     [<RequireQualifiedAccess>]
     module Prepared =
-      let saveThumbnail (saveThumbnailedConversion: Conversion.Thumbnailed.Save) : Conversion.Prepared.SaveThumbnail =
+      let saveThumbnail (env: #IThumbnailedConversionSaver) : Conversion.Prepared.SaveThumbnail =
         fun conversion thumbnail ->
           let thumbnailedConversion: Conversion.Thumbnailed =
             { Id = conversion.Id
               ThumbnailName = thumbnail }
 
-          saveThumbnailedConversion thumbnailedConversion
+          env.SaveThumbnailed thumbnailedConversion
           |> Task.map (fun _ -> thumbnailedConversion)
 
-      let saveVideo (saveConvertedConversion: Conversion.Converted.Save) : Conversion.Prepared.SaveVideo =
+      let saveVideo (env: #IConvertedConversionSaver) : Conversion.Prepared.SaveVideo =
         fun conversion video ->
           let convertedConversion: Conversion.Converted =
             { Id = conversion.Id
               OutputFile = video }
 
-          saveConvertedConversion convertedConversion
+          env.SaveConverted convertedConversion
           |> Task.map (fun _ -> convertedConversion)
 
     [<RequireQualifiedAccess>]
     module Converted =
-      let complete (saveCompletedConversion: Conversion.Completed.Save) : Conversion.Converted.Complete =
+      let complete (env: #ICompletedConversionSaver) : Conversion.Converted.Complete =
         fun conversion thumbnail ->
-          saveCompletedConversion
+          env.SaveCompleted
             { Id = conversion.Id
               OutputFile = (conversion.OutputFile |> Conversion.Video)
               ThumbnailFile = (thumbnail |> Conversion.Thumbnail) }

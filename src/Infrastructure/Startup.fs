@@ -16,6 +16,31 @@ open Infrastructure.Repos
 open Infrastructure.Workflows
 
 module Startup =
+  type DomainEnv(db: IMongoDatabase) =
+    interface INewConversionLoader with
+      member this.LoadNew = Conversion.New.load db
+
+    interface IPreparedConversionSaver with
+      member this.SavePrepared = Conversion.Prepared.save db
+
+    interface ICompletedConversionLoader with
+      member this.LoadCompleted = Conversion.Completed.load db
+
+    interface ICompletedConversionSaver with
+      member this.SaveCompleted = Conversion.Completed.save db
+
+    interface IThumbnailedConversionSaver with
+      member this.SaveThumbnailed = Conversion.Thumbnailed.save db
+
+    interface IConvertedConversionSaver with
+      member this.SaveConverted = Conversion.Converted.save db
+
+    interface IPreparedOrConvertedConversionLoader with
+      member this.LoadPreparedOrConverted = Conversion.PreparedOrConverted.load db
+
+    interface IPreparedOrThumbnailedConversionLoader with
+      member this.LoadPreparedOrThumbnailed = Conversion.PreparedOrThumbnailed.load db
+
   [<Literal>]
   let private chromeUserAgent =
     "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36"
@@ -31,27 +56,22 @@ module Startup =
       .AddPolicyHandler(retryPolicy)
 
     services
-      .BuildSingleton<Conversion.New.Load, IMongoDatabase>(Conversion.New.load)
+      .BuildSingleton<DomainEnv, IMongoDatabase>(DomainEnv)
       .BuildSingleton<Conversion.New.InputFile.DownloadLink, IHttpClientFactory, WorkersSettings>(Conversion.New.InputFile.downloadLink)
+      .BuildSingleton<Conversion.New.Prepare, DomainEnv>(Conversion.New.prepare)
 
       // TODO: Functions of same type. How to register?
       // .BuildSingleton<Conversion.Prepared.QueueConversion, WorkersSettings>(Conversion.Prepared.queueConversion)
       // .BuildSingleton<Conversion.Prepared.QueueThumbnailing, WorkersSettings>(Conversion.Prepared.queueThumbnailing)
 
-      .BuildSingleton<Conversion.Prepared.Save, IMongoDatabase>(Conversion.Prepared.save)
-      .BuildSingleton<Conversion.Prepared.SaveVideo, Conversion.Converted.Save>(Conversion.Prepared.saveVideo)
-      .BuildSingleton<Conversion.Prepared.SaveThumbnail, Conversion.Thumbnailed.Save>(Conversion.Prepared.saveThumbnail)
 
-      .BuildSingleton<Conversion.Completed.Load, IMongoDatabase>(Conversion.Completed.load)
+      .BuildSingleton<Conversion.Prepared.SaveVideo, DomainEnv>(Conversion.Prepared.saveVideo)
+      .BuildSingleton<Conversion.Prepared.SaveThumbnail, DomainEnv>(Conversion.Prepared.saveThumbnail)
+
+
       .BuildSingleton<Conversion.Completed.DeleteVideo, WorkersSettings>(Conversion.Completed.deleteVideo)
       .BuildSingleton<Conversion.Completed.DeleteThumbnail, WorkersSettings>(Conversion.Completed.deleteThumbnail)
-      .BuildSingleton<Conversion.Completed.Save, IMongoDatabase>(Conversion.Completed.save)
       .BuildSingleton<Conversion.Completed.QueueUpload, WorkersSettings>(Conversion.Completed.queueUpload)
-      .BuildSingleton<Conversion.PreparedOrConverted.Load, IMongoDatabase>(Conversion.PreparedOrConverted.load)
-      .BuildSingleton<Conversion.PreparedOrThumbnailed.Load, IMongoDatabase>(Conversion.PreparedOrThumbnailed.load)
 
-      .BuildSingleton<Conversion.Converted.Save, IMongoDatabase>(Conversion.Converted.save)
-      .BuildSingleton<Conversion.Thumbnailed.Save, IMongoDatabase>(Conversion.Thumbnailed.save)
-
-      .BuildSingleton<Conversion.Thumbnailed.Complete, Conversion.Completed.Save>(Conversion.Thumbnailed.complete)
-      .BuildSingleton<Conversion.Converted.Complete, Conversion.Completed.Save>(Conversion.Converted.complete)
+      .BuildSingleton<Conversion.Thumbnailed.Complete, DomainEnv>(Conversion.Thumbnailed.complete)
+      .BuildSingleton<Conversion.Converted.Complete, DomainEnv>(Conversion.Converted.complete)
