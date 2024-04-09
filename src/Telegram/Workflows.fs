@@ -6,6 +6,7 @@ open Telegram.Core
 open otsom.fs.Telegram.Bot.Core
 open otsom.fs.Extensions
 open Domain.Repos
+open Telegram.Repos
 
 module Workflows =
   type DeleteBotMessage = UserId -> BotMessageId -> Task
@@ -13,11 +14,97 @@ module Workflows =
 
   [<RequireQualifiedAccess>]
   module UserConversion =
-    type Load = ConversionId -> Task<UserConversion>
+    let queueProcessing
+      (createConversion: Conversion.Create)
+      (saveUserConversion: UserConversion.Save)
+      (queueConversionPreparation: Conversion.New.QueuePreparation)
+      : UserConversion.QueueProcessing =
+      fun userMessageId userId chatId sentMessageId inputFile ->
+        task {
+          let! conversion = createConversion ()
 
-  [<RequireQualifiedAccess>]
-  module User =
-    type Load = UserId -> Task<User>
+          do!
+            saveUserConversion
+              { ChatId = chatId
+                UserId = userId
+                SentMessageId = sentMessageId
+                ReceivedMessageId = userMessageId
+                ConversionId = conversion.Id }
+
+          return! queueConversionPreparation conversion.Id inputFile
+        }
+
+  let processMessage
+    (sendUserMessage: SendUserMessage)
+    (replyToUserMessage: ReplyToUserMessage)
+    (getLocaleTranslations: Translation.GetLocaleTranslations)
+    (ensureUserExists: User.EnsureExists)
+    (queueUserConversion: UserConversion.QueueProcessing)
+    (parseCommand: ParseCommand)
+    : ProcessMessage =
+    fun message ->
+      let chatId = message.Chat.Id |> UserId
+      let userId = message.From |> Option.ofObj |> Option.map (_.Id >> UserId)
+      let sendMessage = sendUserMessage chatId
+      let replyToMessage = replyToUserMessage chatId message.MessageId
+
+      let processLinks (_, tranf: Translation.FormatTranslation) (queueUserConversion) links =
+        let sendUrlToQueue (url: string) =
+          task {
+            let! sentMessageId = replyToMessage (tranf (Resources.LinkDownload, [| url |]))
+
+            return! queueUserConversion sentMessageId (Conversion.New.InputFile.Link { Url = url })
+          }
+
+        links |> Seq.map sendUrlToQueue |> Task.WhenAll |> Task.ignore
+
+      let processDocument (_, tranf: Translation.FormatTranslation) queueUserConversion fileId fileName =
+        task {
+          let! sentMessageId = replyToMessage (tranf (Resources.DocumentDownload, [| fileName |]))
+
+          return! queueUserConversion sentMessageId (Conversion.New.InputFile.Document { Id = fileId; Name = fileName })
+        }
+
+      let processVideo (_, tranf: Translation.FormatTranslation) queueUserConversion fileId fileName =
+        task {
+          let! sentMessageId = replyToMessage (tranf (Resources.VideoDownload, [| fileName |]))
+
+          return! queueUserConversion sentMessageId (Conversion.New.InputFile.Document { Id = fileId; Name = fileName })
+        }
+
+      let processCommand =
+        fun cmd ->
+          task {
+            let! tran, tranf =
+              message.From
+              |> Option.ofObj
+              |> Option.bind (_.LanguageCode >> Option.ofObj)
+              |> getLocaleTranslations
+
+            return!
+              match cmd with
+              | Command.Start -> sendMessage (tran Resources.Welcome)
+              | Command.Links links ->
+                processLinks (tran, tranf) (queueUserConversion (message.MessageId |> UserMessageId) userId chatId) links
+              | Command.Document(fileId, fileName) ->
+                processDocument (tran, tranf) (queueUserConversion (message.MessageId |> UserMessageId) userId chatId) fileId fileName
+              | Command.Video(fileId, fileName) ->
+                processVideo (tran, tranf) (queueUserConversion (message.MessageId |> UserMessageId) userId chatId) fileId fileName
+          }
+
+      let processMessage' =
+        function
+        | None -> Task.FromResult()
+        | Some cmd ->
+          match message.From |> Option.ofObj with
+          | Some sender ->
+            task {
+              do! ensureUserExists (Mappings.User.fromTg sender)
+              do! processCommand cmd
+            }
+          | None -> processCommand cmd
+
+      parseCommand message |> Task.bind processMessage'
 
   type IUserConversionLoader =
     abstract member LoadUserConversion: UserConversion.Load

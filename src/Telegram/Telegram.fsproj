@@ -8,6 +8,8 @@
   <ItemGroup>
     <Compile Include="Core.fs"/>
     <Compile Include="Resources.fs" />
+    <Compile Include="Repos.fs" />
+    <Compile Include="Mappings.fs" />
     <Compile Include="Workflows.fs"/>
   </ItemGroup>
 
@@ -17,6 +19,7 @@
 
   <ItemGroup>
     <PackageReference Include="otsom.fs.Extensions" Version="0.0.19"/>
+    <PackageReference Include="otsom.fs.Telegram.Bot" Version="0.0.15"/>
   </ItemGroup>
 
 </Project>

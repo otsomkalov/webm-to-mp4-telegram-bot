@@ -8,6 +8,9 @@
   <ItemGroup>
     <Compile Include="Core.fs"/>
     <Compile Include="Mappings.fs"/>
+    <Compile Include="Settings.fs" />
+    <Compile Include="Helpers.fs" />
+    <Compile Include="Repos.fs" />
     <Compile Include="Workflows.fs"/>
     <Compile Include="Startup.fs"/>
   </ItemGroup>

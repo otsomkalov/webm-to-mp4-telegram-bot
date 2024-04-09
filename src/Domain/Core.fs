@@ -1,16 +1,16 @@
 ﻿namespace Domain
 
 open System.Threading.Tasks
-open otsom.fs.Telegram.Bot.Core
 
 module Core =
-  type User = { Id: UserId; Lang: string option }
-
   type ConversionId = ConversionId of string
 
   [<RequireQualifiedAccess>]
   module Conversion =
     type New = { Id: ConversionId }
+
+    type Create = unit -> Task<New>
+
     type Prepared = { Id: ConversionId; InputFile: string }
 
     type Converted =
@@ -47,6 +47,8 @@ module Core =
         | ServerError
 
       type Prepare = ConversionId -> InputFile -> Task<Result<Prepared, DownloadLinkError>>
+
+      type QueuePreparation = ConversionId -> InputFile -> Task<unit>
 
     [<RequireQualifiedAccess>]
     module Prepared =

@@ -20,6 +20,13 @@ module Repos =
           collection.Find(filter).SingleOrDefaultAsync()
           |> Task.map Conversion.New.fromDb
 
+      let save (db: IMongoDatabase) : Conversion.New.Save =
+        let collection = db.GetCollection "conversions"
+
+        fun conversion ->
+          let entity = conversion |> Mappings.Conversion.New.toDb
+          task { do! collection.InsertOneAsync(entity) }
+
     [<RequireQualifiedAccess>]
     module Prepared =
       let save (db: IMongoDatabase) : Conversion.Prepared.Save =

@@ -22,3 +22,10 @@ module Settings =
 
     static member SectionName = "Workers"
 
+  [<CLIMutable>]
+  type DatabaseSettings =
+    { ConnectionString: string
+      Name: string }
+
+    static member SectionName = "Database"
+

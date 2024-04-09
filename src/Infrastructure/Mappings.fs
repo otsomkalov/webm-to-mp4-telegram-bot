@@ -12,6 +12,9 @@ module Mappings =
         match conversion.State with
         | Database.ConversionState.New -> { Id = ConversionId conversion.Id }
 
+      let toDb (conversion: Conversion.New) : Database.Conversion =
+        Database.Conversion(Id = (conversion.Id |> ConversionId.value), State = Database.ConversionState.New)
+
     [<RequireQualifiedAccess>]
     module Prepared =
       let fromDb (conversion: Database.Conversion) : Conversion.Prepared =
@@ -36,7 +39,11 @@ module Mappings =
             OutputFile = conversion.OutputFileName }
 
       let toDb (conversion: Conversion.Converted) : Database.Conversion =
-        Database.Conversion(Id = (conversion.Id |> ConversionId.value), OutputFileName = conversion.OutputFile, State = Database.ConversionState.Converted)
+        Database.Conversion(
+          Id = (conversion.Id |> ConversionId.value),
+          OutputFileName = conversion.OutputFile,
+          State = Database.ConversionState.Converted
+        )
 
     [<RequireQualifiedAccess>]
     module Thumbnailed =
@@ -47,7 +54,11 @@ module Mappings =
             ThumbnailName = conversion.ThumbnailFileName }
 
       let toDb (conversion: Conversion.Thumbnailed) : Database.Conversion =
-        Database.Conversion(Id = (conversion.Id |> ConversionId.value), ThumbnailFileName = conversion.ThumbnailName, State = Database.ConversionState.Thumbnailed)
+        Database.Conversion(
+          Id = (conversion.Id |> ConversionId.value),
+          ThumbnailFileName = conversion.ThumbnailName,
+          State = Database.ConversionState.Thumbnailed
+        )
 
     [<RequireQualifiedAccess>]
     module PreparedOrConverted =

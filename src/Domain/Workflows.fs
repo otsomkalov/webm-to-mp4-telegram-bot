@@ -3,10 +3,21 @@
 open Domain.Core
 open otsom.fs.Extensions
 open Domain.Repos
+open shortid
 
 module Workflows =
   [<RequireQualifiedAccess>]
   module Conversion =
+    let create (saveNewConversion: Conversion.New.Save) : Conversion.Create =
+      fun () ->
+        task {
+          let newConversion: Conversion.New = { Id = ShortId.Generate() |> ConversionId }
+
+          do! saveNewConversion newConversion
+
+          return newConversion
+        }
+
     [<RequireQualifiedAccess>]
     module New =
       let prepare

@@ -1,5 +1,6 @@
 ﻿namespace Telegram.Infrastructure
 
+open System.Text.RegularExpressions
 open Azure.Storage.Blobs
 open Domain.Core
 open FSharp
@@ -10,6 +11,7 @@ open MongoDB.Driver
 open Telegram.Bot
 open Telegram.Core
 open Telegram.Bot.Types
+open Telegram.Infrastructure.Settings
 open Telegram.Workflows
 open Telegram.Infrastructure.Core
 open otsom.fs.Extensions
@@ -17,6 +19,8 @@ open otsom.fs.Telegram.Bot.Core
 open System.Threading.Tasks
 open System
 open Domain.Repos
+open Telegram.Infrastructure.Helpers
+open otsom.fs.Extensions.String
 
 module Workflows =
   let deleteBotMessage (bot: ITelegramBotClient) : DeleteBotMessage =
@@ -52,31 +56,24 @@ module Workflows =
           ))
         |> Task.ignore
 
-[<RequireQualifiedAccess>]
-module UserConversion =
-  let load (db: IMongoDatabase) : UserConversion.Load =
-    let collection = db.GetCollection "users-conversions"
+  let parseCommand (settings: InputValidationSettings) : ParseCommand =
+    let linkRegex = Regex(settings.LinkRegex)
 
-    fun conversionId ->
-      let (ConversionId conversionId) = conversionId
-      let filter = Builders<Database.Conversion>.Filter.Eq((fun c -> c.Id), conversionId)
-
-      collection.Find(filter).SingleOrDefaultAsync()
-      |> Task.map Mappings.UserConversion.fromDb
-
-[<RequireQualifiedAccess>]
-module User =
-  let load (db: IMongoDatabase) : User.Load =
-    let collection = db.GetCollection "users"
-
-    fun userId ->
-      let userId' = userId |> UserId.value
-      let filter = Builders<Database.User>.Filter.Eq((fun c -> c.Id), userId')
-
-      collection.Find(filter).SingleOrDefaultAsync() |> Task.map Mappings.User.fromDb
+    fun message ->
+      match message with
+      | FromBot -> None |> Task.FromResult
+      | Text messageText ->
+        match messageText with
+        | StartsWith "/start" -> Command.Start |> Some |> Task.FromResult
+        | Regex linkRegex matches -> matches |> Command.Links |> Some |> Task.FromResult
+        | _ -> None |> Task.FromResult
+      | Document settings.MimeTypes doc -> Command.Document(doc.FileId, doc.FileName) |> Some |> Task.FromResult
+      | Video settings.MimeTypes vid -> Command.Video(vid.FileId, vid.FileName) |> Some |> Task.FromResult
+      | _ -> None |> Task.FromResult
 
 [<RequireQualifiedAccess>]
 module Conversion =
+
   [<RequireQualifiedAccess>]
   module New =
     [<RequireQualifiedAccess>]
@@ -90,7 +87,9 @@ module Conversion =
 
             use! thumbnailerBlobStream = Storage.getBlobStream workersSettings document.Name workersSettings.Thumbnailer.Input.Container
 
-            do! bot.GetInfoAndDownloadFileAsync(document.Id, thumbnailerBlobStream) |> Task.ignore
+            do!
+              bot.GetInfoAndDownloadFileAsync(document.Id, thumbnailerBlobStream)
+              |> Task.ignore
 
             return document.Name
           }
