@@ -57,7 +57,8 @@ module Startup =
           .Get<DatabaseSettings>())
 
     services
-      .BuildSingleton<Conversion.Create, Conversion.Save>(Conversion.create)
+      .AddSingleton<ConversionId.Generate>(ConversionId.generate)
+      .BuildSingleton<Conversion.Create, ConversionId.Generate, Conversion.Save>(Conversion.create)
       .BuildSingleton<Conversion.Load, IMongoDatabase>(Conversion.load)
       .BuildSingleton<Conversion.Save, IMongoDatabase>(Conversion.save)
 

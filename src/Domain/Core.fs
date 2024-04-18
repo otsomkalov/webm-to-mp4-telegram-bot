@@ -5,6 +5,9 @@ open System.Threading.Tasks
 module Core =
   type ConversionId = ConversionId of string
 
+  module ConversionId =
+    type Generate = unit -> ConversionId
+
   module Conversion =
     type New = { Id: ConversionId }
 
